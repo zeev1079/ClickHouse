@@ -125,13 +125,13 @@ try
     }
     if (!has_default_disk)
     {
-        recordDisk(DEFAULT_DISK_NAME, std::make_shared<DiskLocal>(DEFAULT_DISK_NAME, context->getPath(), 0, context, config, config_prefix));
+        recordDisk(DEFAULT_DISK_NAME, std::make_shared<DiskLocal>(DEFAULT_DISK_NAME, context->getPath(), 0, 0, context, config, config_prefix));
     }
 
     if (!has_local_disk && (context->getApplicationType() == Context::ApplicationType::DISKS))
     {
         throw_away_local_on_update = true;
-        recordDisk(LOCAL_DISK_NAME, std::make_shared<DiskLocal>(LOCAL_DISK_NAME, "/", 0, context, config, config_prefix));
+        recordDisk(LOCAL_DISK_NAME, std::make_shared<DiskLocal>(LOCAL_DISK_NAME, "/", 0, 0, context, config, config_prefix));
     }
     is_initialized = true;
 }

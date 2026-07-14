@@ -19,13 +19,14 @@ public:
     friend class DiskLocalCheckThread;
     friend class DiskLocalReservation;
 
-    DiskLocal(const String & name_, const String & path_, UInt64 keep_free_space_bytes_,
+    DiskLocal(const String & name_, const String & path_, UInt64 keep_free_space_bytes_, UInt64 max_disk_space_bytes_,
               const Poco::Util::AbstractConfiguration & config, const String & config_prefix);
 
     DiskLocal(
         const String & name_,
         const String & path_,
         UInt64 keep_free_space_bytes_,
+        UInt64 max_disk_space_bytes_,
         ContextPtr context,
         const Poco::Util::AbstractConfiguration & config,
         const String & config_prefix);
@@ -174,6 +175,7 @@ private:
     const String disk_path;
     const String disk_checker_path = ".disk_checker_file";
     std::atomic<UInt64> keep_free_space_bytes;
+    std::atomic<UInt64> max_disk_space_bytes;
     LoggerPtr logger;
     DataSourceDescription data_source_description;
 

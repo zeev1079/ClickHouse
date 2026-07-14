@@ -1847,7 +1847,7 @@ catch (...)
 
 static VolumePtr createLocalSingleDiskVolume(const std::string & path, const Poco::Util::AbstractConfiguration & config_)
 {
-    auto disk = std::make_shared<DiskLocal>("_tmp_default", path, 0, config_, "storage_configuration.disks._tmp_default");
+    auto disk = std::make_shared<DiskLocal>("_tmp_default", path, 0, 0, config_, "storage_configuration.disks._tmp_default");
     VolumePtr volume = std::make_shared<SingleDiskVolume>("_tmp_default", disk, 0);
     return volume;
 }

@@ -258,7 +258,7 @@ std::optional<UInt64> DiskLocal::tryReserve(UInt64 bytes, const std::optional<Re
     return {};
 }
 
-static UInt64 getTotalSpaceByName(const String & name, const String & disk_path, UInt64 keep_free_space_bytes)
+static UInt64 getTotalSpaceByName(const String & name, const String & disk_path, UInt64 keep_free_space_bytes, UInt64 max_disk_space_bytes)
 {
     struct statvfs fs{};
     if (name == "default") /// for default disk we get space from path/data/
@@ -266,6 +266,8 @@ static UInt64 getTotalSpaceByName(const String & name, const String & disk_path,
     else
         fs = getStatVFS(disk_path);
     UInt64 total_size = fs.f_blocks * fs.f_frsize;
+    if (max_disk_space_bytes > 0 && total_size > max_disk_space_bytes)
+        total_size = max_disk_space_bytes;
     if (total_size < keep_free_space_bytes)
         return 0;
     return total_size - keep_free_space_bytes;
@@ -275,7 +277,7 @@ std::optional<UInt64> DiskLocal::getTotalSpace() const
 {
     if (broken || readonly)
         return 0;
-    return getTotalSpaceByName(name, disk_path, keep_free_space_bytes);
+    return getTotalSpaceByName(name, disk_path, keep_free_space_bytes, max_disk_space_bytes);
 }
 
 std::optional<UInt64> DiskLocal::getAvailableSpace() const
@@ -290,6 +292,16 @@ std::optional<UInt64> DiskLocal::getAvailableSpace() const
     else
         fs = getStatVFS(disk_path);
     UInt64 total_size = fs.f_bavail * fs.f_frsize;
+
+    UInt64 max_space = max_disk_space_bytes;
+    if (max_space > 0)
+    {
+        /// used_space is host-wide (statvfs cannot isolate per-instance usage on a shared
+        /// filesystem); this is the safe direction, since it never over-reports free space.
+        UInt64 used_space = (fs.f_blocks - fs.f_bavail) * fs.f_frsize;
+        total_size = std::min(total_size, used_space < max_space ? max_space - used_space : UInt64{0});
+    }
+
     if (total_size < keep_free_space_bytes)
         return 0;
     return total_size - keep_free_space_bytes;
@@ -601,8 +613,9 @@ void DiskLocal::applyNewSettings(const Poco::Util::AbstractConfiguration & confi
 {
     String new_disk_path;
     UInt64 new_keep_free_space_bytes = 0;
+    UInt64 new_max_disk_space_bytes = 0;
 
-    loadDiskLocalConfig(name, config, config_prefix, context, new_disk_path, new_keep_free_space_bytes);
+    loadDiskLocalConfig(name, config, config_prefix, context, new_disk_path, new_keep_free_space_bytes, new_max_disk_space_bytes);
 
     if (disk_path != new_disk_path)
         throw Exception(ErrorCodes::UNKNOWN_ELEMENT_IN_CONFIG, "Disk path can't be updated from config {}", name);
@@ -610,23 +623,27 @@ void DiskLocal::applyNewSettings(const Poco::Util::AbstractConfiguration & confi
     if (keep_free_space_bytes != new_keep_free_space_bytes)
         keep_free_space_bytes = new_keep_free_space_bytes;
 
+    if (max_disk_space_bytes != new_max_disk_space_bytes)
+        max_disk_space_bytes = new_max_disk_space_bytes;
+
     IDisk::applyNewSettings(config, context, config_prefix, disk_map);
 }
 
-DiskLocal::DiskLocal(const String & name_, const String & path_, UInt64 keep_free_space_bytes_,
+DiskLocal::DiskLocal(const String & name_, const String & path_, UInt64 keep_free_space_bytes_, UInt64 max_disk_space_bytes_,
                      const Poco::Util::AbstractConfiguration & config, const String & config_prefix)
     : IDisk(name_, config, config_prefix)
     , disk_path(path_)
     , keep_free_space_bytes(keep_free_space_bytes_)
+    , max_disk_space_bytes(max_disk_space_bytes_)
     , logger(getLogger("DiskLocal"))
     , data_source_description(getLocalDataSourceDescription(disk_path))
 {
 }
 
 DiskLocal::DiskLocal(
-    const String & name_, const String & path_, UInt64 keep_free_space_bytes_, ContextPtr context,
+    const String & name_, const String & path_, UInt64 keep_free_space_bytes_, UInt64 max_disk_space_bytes_, ContextPtr context,
     const Poco::Util::AbstractConfiguration & config, const String & config_prefix)
-    : DiskLocal(name_, path_, keep_free_space_bytes_, config, config_prefix)
+    : DiskLocal(name_, path_, keep_free_space_bytes_, max_disk_space_bytes_, config, config_prefix)
 {
     auto local_disk_check_period_ms = config.getUInt("local_disk_check_period_ms", 0);
     if (local_disk_check_period_ms > 0)
@@ -637,6 +654,7 @@ DiskLocal::DiskLocal(const String & name_, const String & path_)
     : IDisk(name_)
     , disk_path(path_)
     , keep_free_space_bytes(0)
+    , max_disk_space_bytes(0)
     , logger(getLogger("DiskLocal"))
     , data_source_description(getLocalDataSourceDescription(disk_path))
 {
@@ -885,7 +903,8 @@ void registerDiskLocal(DiskFactory & factory, bool global_skip_access_check)
     {
         String path;
         UInt64 keep_free_space_bytes = 0;
-        loadDiskLocalConfig(name, config, config_prefix, context, path, keep_free_space_bytes);
+        UInt64 max_disk_space_bytes = 0;
+        loadDiskLocalConfig(name, config, config_prefix, context, path, keep_free_space_bytes, max_disk_space_bytes);
 
         for (const auto & [disk_name, disk_ptr] : map)
             if (path == disk_ptr->getPath())
@@ -893,7 +912,7 @@ void registerDiskLocal(DiskFactory & factory, bool global_skip_access_check)
 
         bool skip_access_check = global_skip_access_check || config.getBool(config_prefix + ".skip_access_check", false);
         std::shared_ptr<IDisk> disk
-            = std::make_shared<DiskLocal>(name, path, keep_free_space_bytes, context, config, config_prefix);
+            = std::make_shared<DiskLocal>(name, path, keep_free_space_bytes, max_disk_space_bytes, context, config, config_prefix);
         disk->startup(skip_access_check);
         return disk;
     };

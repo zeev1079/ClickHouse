@@ -939,6 +939,7 @@ Tags:
 - `<disk_name_N>` — Disk name. Names must be different for all disks.
 - `path` — path under which a server will store data (`data` and `shadow` folders), should be terminated with '/'.
 - `keep_free_space_bytes` — the amount of free disk space to be reserved.
+- `max_disk_space_bytes` — the maximum amount of disk space this disk instance is allowed to use, complementing `keep_free_space_bytes`. When set, `total_space` and `free_space` in [`system.disks`](/operations/system-tables/disks) are capped accordingly. Since ClickHouse cannot isolate per-instance usage via `statvfs` on a shared filesystem, the computed used space is host-wide (all tenants); this is the safe direction, as it never over-reports free space.
 
 The order of the disk definition is not important.
 

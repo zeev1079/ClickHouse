@@ -12,5 +12,6 @@ void loadDiskLocalConfig(
     const String & config_prefix,
     ContextPtr context,
     String & path,
-    UInt64 & keep_free_space_bytes);
+    UInt64 & keep_free_space_bytes,
+    UInt64 & max_disk_space_bytes);
 }

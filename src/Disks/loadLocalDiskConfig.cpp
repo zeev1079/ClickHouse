@@ -18,7 +18,8 @@ void loadDiskLocalConfig(const String & name,
                       const String & config_prefix,
                       ContextPtr context,
                       String & path,
-                      UInt64 & keep_free_space_bytes)
+                      UInt64 & keep_free_space_bytes,
+                      UInt64 & max_disk_space_bytes)
 {
     path = config.getString(config_prefix + ".path", "");
     if (name == "default")
@@ -37,6 +38,8 @@ void loadDiskLocalConfig(const String & name,
         if (path == context->getPath())
             throw Exception(ErrorCodes::UNKNOWN_ELEMENT_IN_CONFIG, "Disk path ('{}') cannot be equal to <path>. Use <default> disk instead.", path);
     }
+
+    max_disk_space_bytes = config.getUInt64(config_prefix + ".max_disk_space_bytes", 0);
 
     bool has_space_ratio = config.has(config_prefix + ".keep_free_space_ratio");
 
@@ -57,7 +60,7 @@ void loadDiskLocalConfig(const String & name,
 
         // Create tmp disk for getting total disk space.
         keep_free_space_bytes
-            = static_cast<UInt64>(static_cast<double>(*DiskLocal("tmp", tmp_path, 0, config, config_prefix).getTotalSpace()) * ratio);
+            = static_cast<UInt64>(static_cast<double>(*DiskLocal("tmp", tmp_path, 0, max_disk_space_bytes, config, config_prefix).getTotalSpace()) * ratio);
     }
 }
 

@@ -138,6 +138,11 @@
                 <disk>s3_no_cache_encrypted</disk>
                 <key>0987654321zyxwvu</key>
             </s3_no_cache_encrypted_double>
+            <local_max_disk_space_bytes>
+                <type>local</type>
+                <path>local_max_disk_space_bytes/</path>
+                <max_disk_space_bytes>10485760</max_disk_space_bytes>
+            </local_max_disk_space_bytes>
         </disks>
         <policies>
             <local_remote>

@@ -254,7 +254,8 @@ static void registerLocalObjectStorage(ObjectStorageFactory & factory)
     {
         String object_key_prefix;
         UInt64 keep_free_space_bytes = 0;
-        loadDiskLocalConfig(name, config, config_prefix, context, object_key_prefix, keep_free_space_bytes);
+        UInt64 max_disk_space_bytes = 0;
+        loadDiskLocalConfig(name, config, config_prefix, context, object_key_prefix, keep_free_space_bytes, max_disk_space_bytes);
 
         /// keys are mapped to the fs, object_key_prefix is a directory also
         fs::create_directories(object_key_prefix);
