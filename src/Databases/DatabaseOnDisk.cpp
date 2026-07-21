@@ -320,8 +320,8 @@ void DatabaseOnDisk::checkRowsLimit(const StoragePtr & table, const String & tab
     if (current_rows + attaching_rows > limit)
         throw Exception(
             ErrorCodes::TOO_MANY_ROWS,
-            "Attaching table {}.{} would exceed the row limit (database setting `max_rows`) of {}: "
-            "current {} + attaching {} rows",
+            "Adding table {}.{} would exceed the row limit (database setting `max_rows`) of {}: "
+            "current {} + adding {} rows",
             backQuote(getDatabaseName()), backQuote(table_name), limit, current_rows, attaching_rows);
 }
 
@@ -524,7 +524,10 @@ void DatabaseOnDisk::renameTable(
             std::swap(create.uuid, prev_uuid);
 
         if (auto * target_db = dynamic_cast<DatabaseOnDisk *>(&to_database))
+        {
             target_db->checkMetadataFilenameAvailability(to_table_name);
+            target_db->checkRowsLimit(table, to_table_name);
+        }
 
         /// This place is actually quite dangerous. Since data directory is moved to store/
         /// DatabaseCatalog may try to clean it up as unused. We add UUID mapping to avoid this.

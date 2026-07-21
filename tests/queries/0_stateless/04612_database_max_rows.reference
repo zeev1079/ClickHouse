@@ -49,3 +49,7 @@ da=50 db=10
 -- 18. max_rows and lazy_load_tables cannot be combined
 BAD_ARGUMENTS
 BAD_ARGUMENTS
+-- 19. RENAME into a full Ordinary database is rejected without orphaning the table
+TOO_MANY_ROWS
+da=50 db=0
+50

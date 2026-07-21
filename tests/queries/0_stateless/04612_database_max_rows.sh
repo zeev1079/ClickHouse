@@ -170,4 +170,15 @@ $CH -q "CREATE DATABASE ${DB} ENGINE = Atomic SETTINGS lazy_load_tables = 1"
 $CH -q "ALTER DATABASE ${DB} MODIFY SETTING max_rows = 5" 2>&1 | grep -oF "BAD_ARGUMENTS" | head -n1
 $CH -q "DROP DATABASE ${DB}"
 
+echo "-- 19. RENAME into a full Ordinary database is rejected without orphaning the table"
+cleanup
+$CH --allow_deprecated_database_ordinary=1 --send_logs_level=fatal -q "CREATE DATABASE ${DA} ENGINE = Ordinary SETTINGS max_rows = 1000"
+$CH --allow_deprecated_database_ordinary=1 --send_logs_level=fatal -q "CREATE DATABASE ${DB} ENGINE = Ordinary SETTINGS max_rows = 40"
+$CH -q "CREATE TABLE ${DA}.big (x UInt64) ENGINE = MergeTree ORDER BY x"
+$CH -q "INSERT INTO ${DA}.big SELECT number FROM numbers(50)"
+$CH -q "RENAME TABLE ${DA}.big TO ${DB}.big" 2>&1 | grep -oF "TOO_MANY_ROWS" | head -n1
+# the source table must stay fully intact (not orphaned by a partial move)
+echo "da=$(db_rows "${DA}") db=$(db_rows "${DB}")"
+$CH -q "SELECT count() FROM ${DA}.big"
+
 cleanup
