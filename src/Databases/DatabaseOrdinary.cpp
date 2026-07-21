@@ -75,7 +75,6 @@ namespace ErrorCodes
     extern const int UNEXPECTED_NODE_IN_ZOOKEEPER;
     extern const int UNKNOWN_TABLE;
     extern const int BAD_ARGUMENTS;
-    extern const int SUPPORT_IS_DISABLED;
     extern const int QUERY_IS_TOO_LARGE;
 }
 
@@ -760,7 +759,7 @@ void DatabaseOrdinary::applySettingsChanges(const SettingsChanges & settings_cha
     /// Only `Atomic`/`Ordinary` populate these settings; `Replicated` keeps metadata in ZooKeeper.
     if (getEngineName() != "Atomic" && getEngineName() != "Ordinary")
         throw Exception(
-            ErrorCodes::SUPPORT_IS_DISABLED,
+            ErrorCodes::NOT_IMPLEMENTED,
             "ALTER DATABASE ... MODIFY SETTING is not supported for the {} database engine", getEngineName());
 
     for (const auto & change : settings_changes)
