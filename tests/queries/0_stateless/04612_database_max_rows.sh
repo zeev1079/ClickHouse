@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests the per-database `max_rows` setting (issue #109355):
-# in-memory row counter, INSERT/ATTACH enforcement, ALTER, rename/exchange, and system.databases.rows.
+# Tests the per-database `max_rows` setting: INSERT/ATTACH/rename/exchange enforcement,
+# ALTER DATABASE MODIFY SETTING, and the system.databases.rows column.
 
 CUR_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=../shell_config.sh
@@ -105,7 +105,31 @@ $CH -q "INSERT INTO ${DA}.u SELECT number FROM numbers(30)"
 $CH -q "EXCHANGE TABLES ${DA}.u AND ${DB}.t"
 echo "after exchange: da=$(db_rows "${DA}") db=$(db_rows "${DB}")"
 
-echo "-- 12. RENAME DATABASE keeps the counter and the setting"
+echo "-- 12. cross-database RENAME into a full database is rejected"
+cleanup
+$CH -q "CREATE DATABASE ${DA} ENGINE = Atomic SETTINGS max_rows = 1000"
+$CH -q "CREATE DATABASE ${DB} ENGINE = Atomic SETTINGS max_rows = 40"
+$CH -q "CREATE TABLE ${DA}.big (x UInt64) ENGINE = MergeTree ORDER BY x"
+$CH -q "INSERT INTO ${DA}.big SELECT number FROM numbers(50)"
+# moving big (50 rows) into DB (limit 40) would exceed it
+$CH -q "RENAME TABLE ${DA}.big TO ${DB}.big" 2>&1 | grep -oF "TOO_MANY_ROWS" | head -n1
+# the table stays in its original database
+echo "da=$(db_rows "${DA}") db=$(db_rows "${DB}")"
+
+echo "-- 13. EXCHANGE that would overflow a destination is rejected"
+cleanup
+$CH -q "CREATE DATABASE ${DA} ENGINE = Atomic SETTINGS max_rows = 1000"
+$CH -q "CREATE DATABASE ${DB} ENGINE = Atomic SETTINGS max_rows = 40"
+$CH -q "CREATE TABLE ${DA}.huge (x UInt64) ENGINE = MergeTree ORDER BY x"
+$CH -q "INSERT INTO ${DA}.huge SELECT number FROM numbers(50)"
+$CH -q "CREATE TABLE ${DB}.small (x UInt64) ENGINE = MergeTree ORDER BY x"
+$CH -q "INSERT INTO ${DB}.small SELECT number FROM numbers(10)"
+# DB would go 10 -> 50 (loses small, gains huge), over its limit of 40
+$CH -q "EXCHANGE TABLES ${DA}.huge AND ${DB}.small" 2>&1 | grep -oF "TOO_MANY_ROWS" | head -n1
+# both tables stay put
+echo "da=$(db_rows "${DA}") db=$(db_rows "${DB}")"
+
+echo "-- 14. RENAME DATABASE keeps the counter and the setting"
 cleanup
 $CH -q "CREATE DATABASE ${DA} ENGINE = Atomic SETTINGS max_rows = 1000"
 $CH -q "CREATE TABLE ${DA}.t (x UInt64) ENGINE = MergeTree ORDER BY x"
@@ -114,12 +138,12 @@ $CH -q "RENAME DATABASE ${DA} TO ${DB}"
 db_rows "${DB}"
 $CH -q "SELECT engine_full LIKE '%max_rows = 1000%' FROM system.databases WHERE name = '${DB}'"
 
-echo "-- 13. DETACH + ATTACH DATABASE reseeds the counter"
+echo "-- 15. DETACH + ATTACH DATABASE reseeds the counter"
 $CH -q "DETACH DATABASE ${DB}"
 $CH -q "ATTACH DATABASE ${DB}"
 db_rows "${DB}"
 
-echo "-- 14. non-MergeTree tables do not consume max_rows headroom"
+echo "-- 16. non-MergeTree tables do not consume max_rows headroom"
 cleanup
 $CH -q "CREATE DATABASE ${DA} ENGINE = Atomic SETTINGS max_rows = 5"
 $CH -q "CREATE TABLE ${DA}.l (x UInt64) ENGINE = Log"
@@ -130,7 +154,7 @@ $CH -q "CREATE TABLE ${DA}.t (x UInt64) ENGINE = MergeTree ORDER BY x"
 $CH -q "INSERT INTO ${DA}.t SELECT number FROM numbers(4)"
 db_rows "${DA}"
 
-echo "-- 15. materialized view inner table counts toward the limit"
+echo "-- 17. materialized view inner table counts toward the limit"
 cleanup
 $CH -q "CREATE DATABASE ${DA} ENGINE = Atomic SETTINGS max_rows = 1000"
 $CH -q "CREATE TABLE ${DA}.src (x UInt64) ENGINE = MergeTree ORDER BY x"
@@ -139,7 +163,7 @@ $CH -q "INSERT INTO ${DA}.src SELECT number FROM numbers(20)"
 # src (20) + mv inner table (20) = 40
 db_rows "${DA}"
 
-echo "-- 16. max_rows and lazy_load_tables cannot be combined"
+echo "-- 18. max_rows and lazy_load_tables cannot be combined"
 $CH -q "DROP DATABASE IF EXISTS ${DB}"
 $CH -q "CREATE DATABASE ${DB} ENGINE = Atomic SETTINGS max_rows = 5, lazy_load_tables = 1" 2>&1 | grep -oF "BAD_ARGUMENTS" | head -n1
 $CH -q "CREATE DATABASE ${DB} ENGINE = Atomic SETTINGS lazy_load_tables = 1"

@@ -91,8 +91,8 @@ public:
     void modifySettingsMetadata(const SettingsChanges & settings_changes, ContextPtr query_context);
 
 protected:
-    /// Throw if attaching `table` would push this database's active-row total past `max_rows`
-    /// (issue #109355). No-op when `max_rows` is 0 or the engine is not row-accounted.
+    /// Throw if attaching `table` would push this database's active-row total past `max_rows`.
+    /// No-op when `max_rows` is 0 or the engine is not row-accounted.
     void checkRowsLimit(const StoragePtr & table, const String & table_name) const;
 
     static constexpr const char * create_suffix = ".tmp";

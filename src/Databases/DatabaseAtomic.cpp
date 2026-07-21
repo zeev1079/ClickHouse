@@ -316,8 +316,8 @@ void DatabaseAtomic::renameTable(ContextPtr local_context, const String & table_
                 throw Exception(ErrorCodes::NOT_IMPLEMENTED, "Cannot move TimeSeries table with inner tables to other database");
     };
 
-    /// issue #109355: RENAME/EXCHANGE bypasses createTable's checkRowsLimit, so enforce
-    /// the destination's `max_rows` here. Callers already hold `moved_into_db.mutex`.
+    /// RENAME/EXCHANGE bypasses createTable's checkRowsLimit, so enforce `max_rows` on the
+    /// destination here. Callers already hold `moved_into_db.mutex`.
     auto check_rows_limit_after_move = [](DatabaseAtomic & moved_into_db, const String & moved_table_name, UInt64 outgoing_rows, UInt64 incoming_rows)
         TSA_REQUIRES(moved_into_db.mutex)
     {
@@ -331,7 +331,7 @@ void DatabaseAtomic::renameTable(ContextPtr local_context, const String & table_
             throw Exception(
                 ErrorCodes::TOO_MANY_ROWS,
                 "Moving table {}.{} would exceed the row limit (database setting `max_rows`) of {}: it would have {} rows",
-                backQuote(moved_into_db.getDatabaseName()), backQuote(moved_table_name), limit, new_rows);
+                backQuote(moved_into_db.database_name), backQuote(moved_table_name), limit, new_rows);
     };
 
     String table_data_path;

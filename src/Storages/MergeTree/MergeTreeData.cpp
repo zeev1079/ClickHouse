@@ -6768,11 +6768,12 @@ void MergeTreeData::delayInsertOrThrowIfNeeded(Poco::Event * until, const Contex
             parts_count_in_total, getLogName());
     }
 
-    /// Check the owning database's `max_rows` limit (issue #109355). Like `max_parts_in_total` above,
-    /// it is checked before the write, so a single batch may overshoot and the next INSERT throws.
+    /// Check the owning database's `max_rows` limit. Like `max_parts_in_total` above, it is
+    /// checked before the write, so a single batch may overshoot and the next INSERT throws.
     if (allow_throw)
     {
-        const auto database = DatabaseCatalog::instance().tryGetDatabase(getStorageID().getDatabaseName());
+        const String database_name = getStorageID().getDatabaseName();
+        const auto database = DatabaseCatalog::instance().tryGetDatabase(database_name);
         const UInt64 limit = database ? database->getMaxRows() : 0;
         if (limit != 0)
         {
@@ -6783,7 +6784,7 @@ void MergeTreeData::delayInsertOrThrowIfNeeded(Poco::Event * until, const Contex
                 throw Exception(
                     ErrorCodes::TOO_MANY_ROWS,
                     "Too many rows in database {}. The limit (database setting `max_rows`) is set to {}, the current number of rows is {}",
-                    backQuote(getStorageID().getDatabaseName()), limit, current_rows);
+                    backQuote(database_name), limit, current_rows);
             }
         }
     }

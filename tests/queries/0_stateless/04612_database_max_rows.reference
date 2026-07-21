@@ -30,16 +30,22 @@ before: da=50 db=0
 after:  da=0 db=50
 -- 11. EXCHANGE across databases keeps both counters correct
 after exchange: da=50 db=30
--- 12. RENAME DATABASE keeps the counter and the setting
+-- 12. cross-database RENAME into a full database is rejected
+TOO_MANY_ROWS
+da=50 db=0
+-- 13. EXCHANGE that would overflow a destination is rejected
+TOO_MANY_ROWS
+da=50 db=10
+-- 14. RENAME DATABASE keeps the counter and the setting
 40
 1
--- 13. DETACH + ATTACH DATABASE reseeds the counter
+-- 15. DETACH + ATTACH DATABASE reseeds the counter
 40
--- 14. non-MergeTree tables do not consume max_rows headroom
+-- 16. non-MergeTree tables do not consume max_rows headroom
 0
 4
--- 15. materialized view inner table counts toward the limit
+-- 17. materialized view inner table counts toward the limit
 40
--- 16. max_rows and lazy_load_tables cannot be combined
+-- 18. max_rows and lazy_load_tables cannot be combined
 BAD_ARGUMENTS
 BAD_ARGUMENTS

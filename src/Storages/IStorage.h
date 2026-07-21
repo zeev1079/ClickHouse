@@ -696,7 +696,7 @@ public:
     /// Same as above but also take partition predicate into account.
     virtual std::optional<UInt64> totalRowsByPartitionPredicate(const ActionsDAG &, ContextPtr) const { return {}; }
 
-    /// Active rows this storage contributes to its database's `max_rows` accounting (issue #109355):
+    /// Active rows this storage contributes to its database's `max_rows` accounting:
     /// `MergeTree` returns its active rows, other engines 0 (not accounted).
     virtual UInt64 rowsForDatabaseLimit() const { return 0; }
 

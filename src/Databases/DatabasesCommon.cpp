@@ -568,7 +568,6 @@ std::optional<UInt64> DatabaseWithOwnTablesBase::getCurrentRowCount() const
 
 UInt64 DatabaseWithOwnTablesBase::getCurrentRowCountUnlocked() const
 {
-    /// issue #109355: sum active rows on demand; 0 for engines that don't report their size.
     UInt64 total = 0;
     for (const auto & [table_name, table] : tables)
         total += table->rowsForDatabaseLimit();

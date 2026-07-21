@@ -86,7 +86,7 @@ extern const DatabaseMetadataDiskSettingsUInt64 max_rows;
 
 namespace
 {
-/// issue #109355: `max_rows` needs table row counts, which lazy loading defers until first access.
+/// `max_rows` needs table row counts, which lazy loading defers until first access.
 void checkMaxRowsNotLazy(UInt64 max_rows, bool lazy_load_tables)
 {
     if (max_rows != 0 && lazy_load_tables)
@@ -127,7 +127,7 @@ DatabaseOrdinary::DatabaseOrdinary(
     else
         metadata_disk_ptr = getContext()->getDatabaseDisk();
 
-    /// Publish the `max_rows` limit (issue #109355), read by the `ATTACH` and INSERT checks.
+    /// Publish the `max_rows` limit, read by the ATTACH and INSERT checks.
     const UInt64 max_rows_setting = database_metadata_disk_settings[DatabaseMetadataDiskSetting::max_rows].value;
     checkMaxRowsNotLazy(max_rows_setting, database_metadata_disk_settings[DatabaseMetadataDiskSetting::lazy_load_tables]);
     max_rows.store(max_rows_setting, std::memory_order_relaxed);

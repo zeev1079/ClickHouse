@@ -252,8 +252,8 @@ void DatabaseOnDisk::createTable(
 
     waitDatabaseStarted();
 
-    /// Enforce `max_rows` on ATTACH (issue #109355). After waitDatabaseStarted() so the count
-    /// sees background-loaded tables (async_load_databases); after the name-collision check but
+    /// Enforce `max_rows` on ATTACH. After waitDatabaseStarted() so the count sees
+    /// background-loaded tables (async_load_databases); after the name-collision check but
     /// before the `attach_short_syntax` early return, so a real `ATTACH TABLE t` is covered.
     checkRowsLimit(table, table_name);
 
@@ -310,7 +310,7 @@ void DatabaseOnDisk::checkRowsLimit(const StoragePtr & table, const String & tab
     if (limit == 0)
         return;
 
-    /// An empty table (0 rows) is always allowed, even if the database is already over budget --
+    /// An empty table is always allowed, even if the database is already over budget --
     /// matching the precedent of allowing an empty CREATE.
     const UInt64 attaching_rows = table->rowsForDatabaseLimit();
     if (attaching_rows == 0)
