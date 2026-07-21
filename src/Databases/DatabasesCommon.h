@@ -79,6 +79,9 @@ protected:
     virtual StoragePtr detachTableUnlocked(const String & table_name) TSA_REQUIRES(mutex);
     StoragePtr getTableUnlocked(const String & table_name) const TSA_REQUIRES(mutex);
     StoragePtr tryGetTableNoWait(const String & table_name) const;
+
+    /// getCurrentRowCount for callers already holding `mutex` (e.g. cross-database rename). issue #109355.
+    UInt64 getCurrentRowCountUnlocked() const TSA_REQUIRES(mutex);
 };
 
 }

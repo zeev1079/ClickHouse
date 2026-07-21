@@ -250,12 +250,12 @@ void DatabaseOnDisk::createTable(
         throw Exception(
             ErrorCodes::TABLE_ALREADY_EXISTS, "Table {}.{} already exists", backQuote(getDatabaseName()), backQuote(table_name));
 
-    /// Enforce the database's `max_rows` limit on ATTACH of a populated table (issue #109355).
-    /// After the name-collision check above (a more specific error should win), but before the
-    /// `attach_short_syntax` early return below so a real `ATTACH TABLE t` is covered.
-    checkRowsLimit(table, table_name);
-
     waitDatabaseStarted();
+
+    /// Enforce `max_rows` on ATTACH (issue #109355). After waitDatabaseStarted() so the count
+    /// sees background-loaded tables (async_load_databases); after the name-collision check but
+    /// before the `attach_short_syntax` early return, so a real `ATTACH TABLE t` is covered.
+    checkRowsLimit(table, table_name);
 
     String table_metadata_path = getObjectMetadataPath(table_name);
 
