@@ -374,6 +374,7 @@ namespace ErrorCodes
     extern const int METADATA_MISMATCH;
     extern const int PART_IS_TEMPORARILY_LOCKED;
     extern const int TOO_MANY_PARTS;
+    extern const int TOO_MANY_ROWS;
     extern const int INCOMPATIBLE_COLUMNS;
     extern const int BAD_TTL_EXPRESSION;
     extern const int INCORRECT_FILE_NAME;
@@ -6765,6 +6766,26 @@ void MergeTreeData::delayInsertOrThrowIfNeeded(Poco::Event * until, const Contex
             "Too many parts ({}) in all partitions in total in table '{}'. This indicates wrong choice of partition key. The threshold can be modified "
             "with 'max_parts_in_total' setting in <merge_tree> element in config.xml or with per-table setting.",
             parts_count_in_total, getLogName());
+    }
+
+    /// Check the owning database's `max_rows` limit (issue #109355). Like `max_parts_in_total` above,
+    /// it is checked before the write, so a single batch may overshoot and the next INSERT throws.
+    if (allow_throw)
+    {
+        const auto database = DatabaseCatalog::instance().tryGetDatabase(getStorageID().getDatabaseName());
+        const UInt64 limit = database ? database->getMaxRows() : 0;
+        if (limit != 0)
+        {
+            const UInt64 current_rows = database->getCurrentRowCount().value_or(0);
+            if (current_rows >= limit)
+            {
+                ProfileEvents::increment(ProfileEvents::RejectedInserts);
+                throw Exception(
+                    ErrorCodes::TOO_MANY_ROWS,
+                    "Too many rows in database {}. The limit (database setting `max_rows`) is set to {}, the current number of rows is {}",
+                    backQuote(getStorageID().getDatabaseName()), limit, current_rows);
+            }
+        }
     }
 
     size_t outdated_parts_over_threshold = 0;

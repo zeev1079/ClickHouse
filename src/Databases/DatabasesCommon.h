@@ -39,6 +39,10 @@ class DatabaseWithOwnTablesBase : public DatabaseWithAltersOnDiskBase, protected
 public:
     bool isExternal() const override { return false; }
 
+    /// issue #109355. getMaxRows: the configured limit; getCurrentRowCount: active rows summed on demand.
+    UInt64 getMaxRows() const override { return max_rows.load(std::memory_order_relaxed); }
+    std::optional<UInt64> getCurrentRowCount() const override;
+
     bool isTableExist(const String & table_name, ContextPtr context) const override;
 
     StoragePtr tryGetTable(const String & table_name, ContextPtr context) const override;
@@ -65,6 +69,9 @@ protected:
     Tables tables TSA_GUARDED_BY(mutex);
     SnapshotDetachedTables snapshot_detached_tables TSA_GUARDED_BY(mutex);
     LoggerPtr log;
+
+    /// issue #109355: `max_rows` limit (0 = unlimited), set by DatabaseOrdinary from settings.
+    std::atomic<UInt64> max_rows = 0;
 
     DatabaseWithOwnTablesBase(const String & name_, const String & logger, ContextPtr context);
 

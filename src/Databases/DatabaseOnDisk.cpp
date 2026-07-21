@@ -76,6 +76,7 @@ namespace ErrorCodes
     extern const int DATABASE_NOT_EMPTY;
     extern const int INCORRECT_QUERY;
     extern const int ARGUMENT_OUT_OF_BOUND;
+    extern const int TOO_MANY_ROWS;
 }
 
 
@@ -249,6 +250,11 @@ void DatabaseOnDisk::createTable(
         throw Exception(
             ErrorCodes::TABLE_ALREADY_EXISTS, "Table {}.{} already exists", backQuote(getDatabaseName()), backQuote(table_name));
 
+    /// Enforce the database's `max_rows` limit on ATTACH of a populated table (issue #109355).
+    /// After the name-collision check above (a more specific error should win), but before the
+    /// `attach_short_syntax` early return below so a real `ATTACH TABLE t` is covered.
+    checkRowsLimit(table, table_name);
+
     waitDatabaseStarted();
 
     String table_metadata_path = getObjectMetadataPath(table_name);
@@ -296,6 +302,27 @@ void DatabaseOnDisk::createTable(
 
     commitCreateTable(create, table, table_metadata_tmp_path, table_metadata_path, local_context);
     removeDetachedPermanentlyFlag(local_context, table_name, table_metadata_path, false);
+}
+
+void DatabaseOnDisk::checkRowsLimit(const StoragePtr & table, const String & table_name) const
+{
+    const UInt64 limit = getMaxRows();
+    if (limit == 0)
+        return;
+
+    /// An empty table (0 rows) is always allowed, even if the database is already over budget --
+    /// matching the precedent of allowing an empty CREATE.
+    const UInt64 attaching_rows = table->rowsForDatabaseLimit();
+    if (attaching_rows == 0)
+        return;
+
+    const UInt64 current_rows = getCurrentRowCount().value_or(0);
+    if (current_rows + attaching_rows > limit)
+        throw Exception(
+            ErrorCodes::TOO_MANY_ROWS,
+            "Attaching table {}.{} would exceed the row limit (database setting `max_rows`) of {}: "
+            "current {} + attaching {} rows",
+            backQuote(getDatabaseName()), backQuote(table_name), limit, current_rows, attaching_rows);
 }
 
 /// If the table was detached permanently we will have a flag file with

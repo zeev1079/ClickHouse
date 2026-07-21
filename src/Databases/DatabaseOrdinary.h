@@ -78,6 +78,10 @@ public:
         const StorageInMemoryMetadata & metadata,
         bool validate_new_create_query) override;
 
+    /// `ALTER DATABASE ... MODIFY SETTING max_rows = N` (issue #109355). Supported only by the
+    /// `Atomic` and `Ordinary` engines; other engines throw.
+    void applySettingsChanges(const SettingsChanges & settings_changes, ContextPtr query_context) override;
+
     Strings getNamesOfPermanentlyDetachedTables() const override
     {
         std::lock_guard lock(mutex);

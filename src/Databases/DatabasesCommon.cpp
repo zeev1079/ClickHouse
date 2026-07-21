@@ -560,6 +560,16 @@ void DatabaseWithOwnTablesBase::attachTableUnlocked(const String & table_name, c
     }
 }
 
+std::optional<UInt64> DatabaseWithOwnTablesBase::getCurrentRowCount() const
+{
+    /// issue #109355: sum active rows on demand; 0 for engines that don't report their size.
+    UInt64 total = 0;
+    std::lock_guard lock(mutex);
+    for (const auto & [table_name, table] : tables)
+        total += table->rowsForDatabaseLimit();
+    return total;
+}
+
 void DatabaseWithOwnTablesBase::shutdown()
 {
     /// You can not hold a lock during shutdown.

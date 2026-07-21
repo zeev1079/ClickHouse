@@ -806,6 +806,9 @@ public:
     size_t getTotalActiveSizeInRows() const;
     size_t getTotalUncompressedBytesInPatches() const;
 
+    /// issue #109355: active rows summed on demand for the database's `max_rows` limit.
+    UInt64 rowsForDatabaseLimit() const override { return getTotalActiveSizeInRows(); }
+
     /// All-or-nothing aggregate of per-part `SerializationInfo::Data` for `column_name`:
     /// returns nullopt unless every visible part has exact stats (see `SparsityFilter.h`).
     std::optional<ColumnDefaultnessStats>
