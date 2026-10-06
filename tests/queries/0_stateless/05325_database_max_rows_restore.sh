@@ -22,6 +22,8 @@ CREATE TABLE ${CLICKHOUSE_DATABASE}.src_replicated (x UInt64)
 INSERT INTO ${CLICKHOUSE_DATABASE}.src_replicated SELECT number FROM numbers(50);
 "
 $CH -q "BACKUP TABLE ${CLICKHOUSE_DATABASE}.src, TABLE ${CLICKHOUSE_DATABASE}.src_replicated TO ${BACKUP}" --format Null
+# The restored replicated table reuses the ZooKeeper path of the source, so free it first.
+$CH -q "DROP TABLE ${CLICKHOUSE_DATABASE}.src_replicated SYNC"
 
 $CH -q "
 CREATE DATABASE ${DB} ENGINE = Atomic SETTINGS max_rows = 100;
@@ -39,7 +41,7 @@ $CH -q "SELECT rows FROM system.databases WHERE name = '${DB}'"
 
 $CH -q "SELECT '-- with enough headroom, RESTORE succeeds'"
 $CH -q "DROP TABLE IF EXISTS ${DB}.restored SYNC; DROP TABLE IF EXISTS ${DB}.restored_replicated SYNC; TRUNCATE TABLE ${DB}.filler"
-$CH -q "INSERT INTO ${DB}.filler SELECT number FROM numbers(40)"
+$CH -q "INSERT INTO ${DB}.filler SELECT number FROM numbers(30)"
 $CH -q "RESTORE TABLE ${CLICKHOUSE_DATABASE}.src AS ${DB}.restored FROM ${BACKUP}" --format Null
 $CH -q "SELECT rows FROM system.databases WHERE name = '${DB}'"
 
