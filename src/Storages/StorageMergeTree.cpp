@@ -4302,6 +4302,13 @@ BackupEntries StorageMergeTree::backupMutations(UInt64 version, const String & d
 
 void StorageMergeTree::attachRestoredParts(MutableDataPartsVector && parts, const std::optional<ZooKeeperRetriesInfo> &)
 {
+    /// `RESTORE` adds rows like `ATTACH PARTITION`, so it is checked against the database `max_rows`
+    /// limit for all restored parts of the table together, before any of them is committed.
+    UInt64 incoming_rows = 0;
+    for (const auto & part : parts)
+        incoming_rows += part->rows_count;
+    checkDatabaseRowsLimit(incoming_rows);
+
     for (auto part : parts)
     {
         /// It's important to create it outside of lock scope because
