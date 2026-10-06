@@ -175,7 +175,8 @@ ReplicatedMergeTreeSink::ReplicatedMergeTreeSink(
     /// With insert deduplication, the database `max_rows` check is evaluated here as well, but its
     /// verdict is carried to `commitPart` and thrown only for a part that is not a duplicate, so that
     /// retrying an INSERT which was already written stays a no-op even once the database is full.
-    /// `ATTACH` is checked for the whole batch in `StorageReplicatedMergeTree::attachPartitionImpl`.
+    /// `ATTACH` is checked for the whole batch in `StorageReplicatedMergeTree::attachPartitionImpl`,
+    /// which passes its verdict through `setDatabaseRowsLimitException`.
     const bool defer_database_rows_limit = deduplicate && !is_attach;
     try
     {
@@ -966,8 +967,9 @@ std::vector<DeduplicationHash> ReplicatedMergeTreeSink::commitPart(
         }
 
         /// For an INSERT into a database that had already reached `max_rows` when the insert
-        /// started (see the constructor), a duplicate part was accepted above as a no-op, while a
-        /// part that would add rows is rejected here. Throwing here is safe: only the ephemeral
+        /// started (see the constructor), or an `ATTACH PARTITION` batch that would exceed it,
+        /// a duplicate part was accepted above as a no-op, while a part that would add rows is
+        /// rejected here. Throwing here is safe: only the ephemeral
         /// block number node exists at this point, and it is released by the lock's destructor.
         if (database_rows_limit_exception)
         {

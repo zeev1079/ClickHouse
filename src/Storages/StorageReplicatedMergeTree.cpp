@@ -7761,13 +7761,16 @@ PartitionCommandsResultInfo StorageReplicatedMergeTree::attachPartitionImpl(
         /* is_attach */ true,
         /* allow_attach_while_readonly */ allow_attach_while_readonly);
 
-    /// All-or-nothing pre-check for the database `max_rows` limit. A check inside the commit
-    /// loop could not roll back: parts committed earlier in the loop are already in ZooKeeper,
-    /// so failing in the middle would leave the command partially applied. Ask ZooKeeper up front
-    /// which parts are already deduplicated -- those add no rows and are excluded from the
-    /// aggregate, so attaching only duplicates stays a no-op even when the database is over the
-    /// limit -- and validate the rest together before anything is committed. Like the other
-    /// `max_rows` checks, it is best-effort: an insert racing with it may overshoot the limit.
+    /// All-or-nothing check for the database `max_rows` limit. A check of each part's own rows
+    /// inside the commit loop could not roll back: parts committed earlier in the loop are already
+    /// in ZooKeeper, so failing in the middle would leave the command partially applied. Ask
+    /// ZooKeeper up front which parts are already deduplicated -- those add no rows and are
+    /// excluded from the aggregate -- and validate the rest together before anything is committed.
+    /// The verdict is not thrown here but handed to the sink, which throws it in `commitPart` only
+    /// for a part that Keeper does not deduplicate. So a part that becomes a duplicate after this
+    /// snapshot (e.g. a concurrent INSERT of the same data) stays a no-op, and when the batch is over
+    /// the limit, no part that adds rows is committed. Like the other `max_rows` checks, it is
+    /// best-effort: an insert racing with it may overshoot the limit.
     if (deduplicate_part && !allow_attach_while_readonly && hasDatabaseRowsLimit())
     {
         const bool deduplicate = (*getSettings())[MergeTreeSetting::replicated_deduplication_window] != 0;
@@ -7797,7 +7800,7 @@ PartitionCommandsResultInfo StorageReplicatedMergeTree::attachPartitionImpl(
                 incoming_rows += part->rows_count;
         }
 
-        checkDatabaseRowsLimit(incoming_rows);
+        output.setDatabaseRowsLimitException(getDatabaseRowsLimitException(incoming_rows));
     }
 
     results.reserve(loaded_parts.size());

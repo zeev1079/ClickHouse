@@ -910,6 +910,9 @@ public:
     /// `outgoing_rows` from the same database, would exceed `max_rows`.
     void checkDatabaseRowsLimit(UInt64 incoming_rows, UInt64 outgoing_rows = 0) const;
 
+    /// The exception `checkDatabaseRowsLimit` would throw, or nullptr if the limit is not exceeded.
+    std::exception_ptr getDatabaseRowsLimitException(UInt64 incoming_rows, UInt64 outgoing_rows = 0) const;
+
     /// If the table contains too many unfinished mutations, sleep for a while to give them time to execute.
     /// If until is non-null, wake up from the sleep earlier if the event happened.
     /// The decision to delay or throw is made according to settings 'number_of_mutations_to_delay' and 'number_of_mutations_to_throw'.

@@ -8807,25 +8807,33 @@ bool MergeTreeData::hasDatabaseRowsLimit() const
 
 void MergeTreeData::checkDatabaseRowsLimit(UInt64 incoming_rows, UInt64 outgoing_rows) const
 {
+    if (auto exception = getDatabaseRowsLimitException(incoming_rows, outgoing_rows))
+        std::rethrow_exception(exception);
+}
+
+std::exception_ptr MergeTreeData::getDatabaseRowsLimitException(UInt64 incoming_rows, UInt64 outgoing_rows) const
+{
     /// This is a best-effort snapshot check, not a reservation spanning the commit: concurrent
     /// operations may each observe free headroom and transiently overshoot the limit together.
     /// The `max_rows` setting is documented accordingly.
     if (incoming_rows <= outgoing_rows)
-        return;
+        return nullptr;
 
     const String database_name = getStorageID().getDatabaseName();
     const auto database = DatabaseCatalog::instance().tryGetDatabase(database_name);
     const UInt64 limit = database ? database->getMaxRows() : 0;
     if (limit == 0)
-        return;
+        return nullptr;
 
     const UInt64 current_rows = database->getCurrentRowCount().value_or(0);
     const UInt64 remaining_rows = current_rows > outgoing_rows ? current_rows - outgoing_rows : 0;
     if (incoming_rows > limit || remaining_rows > limit - incoming_rows)
-        throw Exception(
+        return std::make_exception_ptr(Exception(
             ErrorCodes::TOO_MANY_ROWS,
             "Adding {} rows to table {} would exceed the row limit (database setting `max_rows`) of {}: current {} - removing {} + adding {} rows",
-            incoming_rows, getStorageID().getNameForLogs(), limit, current_rows, outgoing_rows, incoming_rows);
+            incoming_rows, getStorageID().getNameForLogs(), limit, current_rows, outgoing_rows, incoming_rows));
+
+    return nullptr;
 }
 
 void MergeTreeData::delayMutationOrThrowIfNeeded(Poco::Event * until, const ContextPtr & query_context) const

@@ -54,6 +54,10 @@ struct DelayedPartInPartition
 class ReplicatedMergeTreeSink : public SinkToStorage
 {
 public:
+    /// Reject every part of this sink that turns out not to be a duplicate with `exception`.
+    /// Used by `ATTACH PARTITION` when its batch would exceed the database `max_rows` limit.
+    void setDatabaseRowsLimitException(std::exception_ptr exception) { database_rows_limit_exception = std::move(exception); }
+
     ReplicatedMergeTreeSink(
         bool async_insert_,
         StorageReplicatedMergeTree & storage_,
@@ -146,8 +150,9 @@ protected:
     /// construction and thrown from onStart, when the sink starts executing.
     std::exception_ptr too_many_parts_exception;
 
-    /// The database `max_rows` check of an INSERT with deduplication, evaluated at sink construction
-    /// and thrown from `commitPart` only for a part that turns out not to be a duplicate.
+    /// The database `max_rows` check of an INSERT with deduplication (evaluated at sink construction)
+    /// or of an `ATTACH PARTITION` batch (see `setDatabaseRowsLimitException`), thrown from
+    /// `commitPart` only for a part that turns out not to be a duplicate.
     std::exception_ptr database_rows_limit_exception;
 
     bool is_attach = false;
