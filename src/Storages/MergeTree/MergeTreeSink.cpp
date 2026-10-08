@@ -427,23 +427,33 @@ std::vector<std::string> MergeTreeSink::commitPart(MergeTreeMutableDataPartPtr &
         auto lock = storage.lockParts();
         auto block_holder = storage.fillNewPartName(part, lock);
 
+        /// Check the size limits of a temporary table under the same lock as the deduplication and the commit,
+        /// so that concurrent inserts cannot make the table exceed them. A block that is already in
+        /// the deduplication log is not committed as is: `addPart` reports the conflict, and the part is either
+        /// skipped or rewritten from the remaining rows, which is checked on the next try.
+        std::vector<std::string> block_ids;
+        if (!deduplication_hashes.empty())
+            block_ids = getDeduplicationBlockIds(deduplication_hashes);
+
+        auto * deduplication_log = storage.getDeduplicationLog();
+        const bool is_duplicate = !block_ids.empty() && deduplication_log && deduplication_log->containsAny(block_ids);
+
         /// The database had already reached `max_rows` when this insert started (see the constructor).
         /// Reject the part unless it is a duplicate, which `addPart` below accepts as a no-op. This is
         /// decided before `addPart`, which would record the block ids of a part that is not committed.
         /// The parts lock serializes this with the `addPart` of the other inserts.
-        if (database_rows_limit_exception
-            && (deduplication_hashes.empty()
-                || !storage.getDeduplicationLog()->containsAnyBlock(getDeduplicationBlockIds(deduplication_hashes))))
+        if (database_rows_limit_exception && !is_duplicate)
         {
             ProfileEvents::increment(ProfileEvents::RejectedInserts);
             std::rethrow_exception(database_rows_limit_exception);
         }
 
-        if (!deduplication_hashes.empty())
+        if (!is_duplicate)
+            storage.throwIfTemporaryTableSizeLimitsExceededForReplacement(context, lock, {part}, std::nullopt);
+
+        if (!block_ids.empty())
         {
-            auto * deduplication_log = storage.getDeduplicationLog();
             chassert(deduplication_log);
-            auto block_ids = getDeduplicationBlockIds(deduplication_hashes);
             auto result = deduplication_log->addPart(block_ids, part->info);
 
             std::vector<std::string> conflict_block_ids;
