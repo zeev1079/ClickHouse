@@ -187,7 +187,7 @@ private:
     std::unique_ptr<WriteBufferFromFileBase> current_writer;
 
     /// Overall mutex because we can have a lot of concurrent inserts
-    mutable std::mutex state_mutex;
+    std::mutex state_mutex;
 
     /// Disk where log is stored
     DiskPtr disk;
