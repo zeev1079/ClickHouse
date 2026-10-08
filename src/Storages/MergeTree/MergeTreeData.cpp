@@ -10070,6 +10070,14 @@ private:
             parts.end(),
             [](const MutableDataPartPtr & lhs, const MutableDataPartPtr & rhs) { return lhs->info.min_block < rhs->info.min_block; });
 
+        /// `RESTORE` adds rows like `ATTACH PARTITION`, so it is checked against the database `max_rows`
+        /// limit for all restored parts of the table together, before any of them is committed.
+        /// The check is done here rather than in `attachRestoredParts` so that it covers every engine.
+        UInt64 incoming_rows = 0;
+        for (const auto & part : parts)
+            incoming_rows += part->rows_count;
+        storage->checkDatabaseRowsLimit(incoming_rows);
+
         storage->attachRestoredParts(std::move(parts), zookeeper_retries_info);
         parts.clear();
         temp_part_dirs.clear();

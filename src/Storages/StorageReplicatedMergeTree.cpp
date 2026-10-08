@@ -12306,13 +12306,6 @@ void StorageReplicatedMergeTree::attachRestoredParts(
     auto component_guard = Coordination::setCurrentComponent("StorageReplicatedMergeTree::attachRestoredParts");
     auto metadata_snapshot = getInMemoryMetadataPtr(getContext(), false);
 
-    /// `RESTORE` adds rows like `ATTACH PARTITION`, so it is checked against the database `max_rows`
-    /// limit for all restored parts of the table together, before any of them is committed.
-    UInt64 incoming_rows = 0;
-    for (const auto & part : parts)
-        incoming_rows += part->rows_count;
-    checkDatabaseRowsLimit(incoming_rows);
-
     auto sink = std::make_shared<ReplicatedMergeTreeSink>(
         /* async_insert */ false, *this, metadata_snapshot, /* quorum */ 0, /* quorum_timeout_ms */ 0, /* max_parts_per_block */ 0, /* quorum_parallel */ false,
         /* majority_quorum */ false, getContext(), /* is_attach */ true, /* allow_attach_while_readonly */ false, zookeeper_retries_info);
