@@ -363,6 +363,9 @@ void DatabaseOnDisk::createTableImpl(
 
 void DatabaseOnDisk::checkRowsLimit(const StoragePtr & table, const String & table_name) const
 {
+    /// Without a limit, do not ask the storage for its rows: a lazy table proxy would load the table.
+    if (getMaxRows() == 0)
+        return;
     checkRowsLimit(table->rowsForDatabaseLimit(), table_name);
 }
 
