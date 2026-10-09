@@ -19,7 +19,6 @@ DETACH DATABASE {CLICKHOUSE_DATABASE_1:Identifier};
 ATTACH DATABASE {CLICKHOUSE_DATABASE_1:Identifier};
 
 SELECT rows FROM system.databases WHERE name = {CLICKHOUSE_DATABASE_1:String};
--- The style check needs `currentDatabase()` in queries to `system.tables`; `USE` does not load the lazy tables.
 USE {CLICKHOUSE_DATABASE_1:Identifier};
 SELECT engine FROM system.tables WHERE database = currentDatabase() AND name = 't';
 USE {CLICKHOUSE_DATABASE:Identifier};
