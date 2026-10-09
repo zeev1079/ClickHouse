@@ -384,7 +384,7 @@ void DatabaseOnDisk::checkRowsLimit(UInt64 attaching_rows, const String & table_
         return;
 
     const UInt64 current_rows = getCurrentRowCount().value_or(0);
-    if (current_rows + attaching_rows > limit)
+    if (attaching_rows > limit || current_rows > limit - attaching_rows)
         throw Exception(
             ErrorCodes::TOO_MANY_ROWS,
             "Adding table {}.{} would exceed the row limit (database setting `max_rows`) of {}: "

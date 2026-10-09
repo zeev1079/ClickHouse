@@ -350,12 +350,14 @@ void DatabaseAtomic::renameTable(ContextPtr local_context, const String & table_
         const UInt64 limit = moved_into_db.getMaxRows();
         if (limit == 0)
             return;
-        const UInt64 new_rows = moved_into_db.getCurrentRowCountUnlocked() - outgoing_rows + incoming_rows;
-        if (new_rows > limit)
+        const UInt64 current_rows = moved_into_db.getCurrentRowCountUnlocked();
+        const UInt64 remaining_rows = current_rows > outgoing_rows ? current_rows - outgoing_rows : 0;
+        if (incoming_rows > limit || remaining_rows > limit - incoming_rows)
             throw Exception(
                 ErrorCodes::TOO_MANY_ROWS,
-                "Moving table {}.{} would exceed the row limit (database setting `max_rows`) of {}: it would have {} rows",
-                backQuote(moved_into_db.database_name), backQuote(moved_table_name), limit, new_rows);
+                "Moving table {}.{} would exceed the row limit (database setting `max_rows`) of {}: "
+                "current {} - removing {} + adding {} rows",
+                backQuote(moved_into_db.database_name), backQuote(moved_table_name), limit, current_rows, outgoing_rows, incoming_rows);
     };
 
     String table_data_path;
