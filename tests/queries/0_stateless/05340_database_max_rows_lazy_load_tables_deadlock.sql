@@ -6,7 +6,7 @@ SET ast_fuzzer_any_query = 0;
 DROP DATABASE IF EXISTS {CLICKHOUSE_DATABASE_2:Identifier};
 DROP DATABASE IF EXISTS {CLICKHOUSE_DATABASE_1:Identifier};
 CREATE DATABASE {CLICKHOUSE_DATABASE_1:Identifier} ENGINE = Atomic SETTINGS lazy_load_tables = 1;
-CREATE DATABASE {CLICKHOUSE_DATABASE_2:Identifier} ENGINE = Atomic SETTINGS max_rows = 100;
+CREATE DATABASE {CLICKHOUSE_DATABASE_2:Identifier} ENGINE = Atomic SETTINGS max_rows = 3;
 
 CREATE TABLE {CLICKHOUSE_DATABASE_1:Identifier}.source (y UInt64) ENGINE = MergeTree ORDER BY y;
 INSERT INTO {CLICKHOUSE_DATABASE_1:Identifier}.source SELECT number FROM numbers(10);
@@ -23,10 +23,8 @@ USE {CLICKHOUSE_DATABASE_1:Identifier};
 SELECT engine FROM system.tables WHERE database = currentDatabase() AND name = 't';
 USE {CLICKHOUSE_DATABASE:Identifier};
 
-RENAME TABLE {CLICKHOUSE_DATABASE_1:Identifier}.t TO {CLICKHOUSE_DATABASE_2:Identifier}.t;
-SELECT rows FROM system.databases WHERE name = {CLICKHOUSE_DATABASE_2:String};
-SELECT count() FROM {CLICKHOUSE_DATABASE_2:Identifier}.t;
+RENAME TABLE {CLICKHOUSE_DATABASE_1:Identifier}.t TO {CLICKHOUSE_DATABASE_2:Identifier}.t; -- { serverError TOO_MANY_ROWS }
+SELECT count() FROM {CLICKHOUSE_DATABASE_1:Identifier}.t;
 
--- The moved table depends on `source` through its constraint, so its database is dropped first.
 DROP DATABASE {CLICKHOUSE_DATABASE_2:Identifier};
 DROP DATABASE {CLICKHOUSE_DATABASE_1:Identifier};
