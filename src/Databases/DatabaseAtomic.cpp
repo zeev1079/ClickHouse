@@ -13,6 +13,7 @@
 #include <Interpreters/ExternalDictionariesLoader.h>
 #include <Interpreters/Context.h>
 #include <Storages/StorageMaterializedView.h>
+#include <Storages/StorageProxy.h>
 #include <Storages/StorageTimeSeries.h>
 #include <base/isSharedPtrUnique.h>
 #include <Common/PoolId.h>
@@ -282,6 +283,12 @@ void DatabaseAtomic::renameTable(ContextPtr local_context, const String & table_
         /// Row-limit checks below use the exact table total of both databases.
         /// Wait before taking either database mutex because startup itself takes it.
         other_db.waitDatabaseStarted();
+
+        /// The checks also count the rows of the moved tables, which loads a lazy table. Load it here, before taking
+        /// the database mutexes: loading it under them can deadlock. The DDL guards keep both tables attached.
+        resolveStorageProxyLoading(tryGetTable(table_name, local_context));
+        if (exchange)
+            resolveStorageProxyLoading(other_db.tryGetTable(to_table_name, local_context));
     }
 
     String old_metadata_path = getObjectMetadataPath(table_name);

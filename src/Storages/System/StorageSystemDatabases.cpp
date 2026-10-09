@@ -39,7 +39,7 @@ ColumnsDescription StorageSystemDatabases::getColumnsDescription()
         {"is_external", std::make_shared<DataTypeUInt8>(), "Database is external (i.e. PostgreSQL/DataLakeCatalog)."},
         {"rows", std::make_shared<DataTypeNullable>(std::make_shared<DataTypeUInt64>()),
             "Current number of active rows counted toward the database's `max_rows` setting. "
-            "NULL for engines that do not track it (e.g. remote and data-lake catalogs), "
+            "NULL for engines that do not track it (e.g. remote and data-lake catalogs) and for databases with `lazy_load_tables`, "
             "and NULL unless the current user has `SHOW TABLES` on the whole database: "
             "the total covers every table, so it is hidden from users with partial grants."},
     };

@@ -137,7 +137,7 @@ $CH -q "RENAME TABLE ${DA}.big TO ${DB}.big" 2>&1 | grep -oF "TOO_MANY_ROWS" | h
 $CH -q "
 SELECT concat('da=', toString((SELECT rows FROM system.databases WHERE name = '${DA}')), ' db=', toString((SELECT rows FROM system.databases WHERE name = '${DB}')));
 SELECT count() FROM ${DA}.big;
-SELECT '-- 12. lazy proxy forwards rows for reporting and cross-database RENAME';
+SELECT '-- 12. a lazy database reports no rows, a cross-database RENAME still counts its table';
 DROP DATABASE ${DA};
 DROP DATABASE ${DB};
 CREATE DATABASE ${DA} ENGINE = Atomic SETTINGS lazy_load_tables = 1;
@@ -146,7 +146,7 @@ CREATE TABLE ${DA}.big (x UInt64) ENGINE = MergeTree ORDER BY x;
 INSERT INTO ${DA}.big SELECT number FROM numbers(50);
 DETACH DATABASE ${DA};
 ATTACH DATABASE ${DA};
--- Reading database rows must materialize the proxy and report its active rows.
+-- A lazy database reports no rows: counting them would load its tables.
 SELECT rows FROM system.databases WHERE name = '${DA}';
 "
 $CH -q "RENAME TABLE ${DA}.big TO ${DB}.big" 2>&1 | grep -oF "TOO_MANY_ROWS" | head -n1
