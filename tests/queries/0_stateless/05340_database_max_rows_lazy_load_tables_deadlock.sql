@@ -19,7 +19,10 @@ DETACH DATABASE {CLICKHOUSE_DATABASE_1:Identifier};
 ATTACH DATABASE {CLICKHOUSE_DATABASE_1:Identifier};
 
 SELECT rows FROM system.databases WHERE name = {CLICKHOUSE_DATABASE_1:String};
-SELECT engine FROM system.tables WHERE database = {CLICKHOUSE_DATABASE_1:String} AND name = 't';
+-- The style check needs `currentDatabase()` in queries to `system.tables`; `USE` does not load the lazy tables.
+USE {CLICKHOUSE_DATABASE_1:Identifier};
+SELECT engine FROM system.tables WHERE database = currentDatabase() AND name = 't';
+USE {CLICKHOUSE_DATABASE:Identifier};
 
 RENAME TABLE {CLICKHOUSE_DATABASE_1:Identifier}.t TO {CLICKHOUSE_DATABASE_2:Identifier}.t;
 SELECT rows FROM system.databases WHERE name = {CLICKHOUSE_DATABASE_2:String};
