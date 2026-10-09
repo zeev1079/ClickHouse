@@ -277,6 +277,8 @@ void DatabaseAtomic::renameTable(ContextPtr local_context, const String & table_
     if (!inside_database)
         other_db.ensurePopulated();
 
+    UInt64 table_rows = 0;
+    UInt64 other_table_rows = 0;
     if (!inside_database)
     {
         other_db.createDirectories();
@@ -284,11 +286,15 @@ void DatabaseAtomic::renameTable(ContextPtr local_context, const String & table_
         /// Wait before taking either database mutex because startup itself takes it.
         other_db.waitDatabaseStarted();
 
-        /// The checks also count the rows of the moved tables, which loads a lazy table. Load it here, before taking
-        /// the database mutexes: loading it under them can deadlock. The DDL guards keep both tables attached.
-        resolveStorageProxyLoading(tryGetTable(table_name, local_context));
+        /// The checks also count the rows of the moved tables, which loads a lazy table. Count them here, before taking
+        /// the database mutexes: loading a lazy table takes its proxy mutex and then the database mutex, so even asking
+        /// an already loaded proxy for its rows under the database mutex inverts the lock order.
+        /// The DDL guards keep both tables attached. A missing table is reported below.
+        if (auto table_to_move = tryGetTable(table_name, local_context))
+            table_rows = resolveStorageProxyLoading(table_to_move)->rowsForDatabaseLimit();
         if (exchange)
-            resolveStorageProxyLoading(other_db.tryGetTable(to_table_name, local_context));
+            if (auto other_table_to_move = other_db.tryGetTable(to_table_name, local_context))
+                other_table_rows = resolveStorageProxyLoading(other_table_to_move)->rowsForDatabaseLimit();
     }
 
     String old_metadata_path = getObjectMetadataPath(table_name);
@@ -405,8 +411,6 @@ void DatabaseAtomic::renameTable(ContextPtr local_context, const String & table_
 
     if (!inside_database)
     {
-        const UInt64 table_rows = table->rowsForDatabaseLimit();
-        const UInt64 other_table_rows = exchange ? other_table->rowsForDatabaseLimit() : 0;
         check_rows_limit_after_move(*this, table_name, table_rows, other_table_rows);
         check_rows_limit_after_move(other_db, to_table_name, other_table_rows, table_rows);
     }
