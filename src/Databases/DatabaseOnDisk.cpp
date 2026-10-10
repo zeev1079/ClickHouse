@@ -45,6 +45,7 @@
 #include <Common/logger_useful.h>
 #include <Common/setThreadName.h>
 #include <Common/ThreadPool.h>
+#include <base/scope_guard.h>
 
 
 namespace fs = std::filesystem;
@@ -591,6 +592,14 @@ static UInt64 getRowsToMove(const StoragePtr & table, const ContextPtr & local_c
     return result;
 }
 
+/// The destination database whose `max_tables` and `max_rows` quotas an outer cross-database
+/// `RENAME` has already checked for the whole bundle of tables it moves (see `getNumberOfTablesToMove`
+/// and `getRowsToMove`). `TimeSeries` and `MaterializedView` move their inner tables with nested
+/// `RENAME` queries from `renameInMemory`, executed synchronously in the same thread. Rechecking the
+/// quotas there could make a later inner rename fail after earlier ones have already moved (e.g. due
+/// to a concurrent `INSERT` or `CREATE TABLE`), leaving the outer table split across databases.
+static thread_local const IDatabase * destination_with_checked_quotas = nullptr;
+
 void DatabaseOnDisk::renameTable(
         ContextPtr local_context,
         const String & table_name,
@@ -639,7 +648,8 @@ void DatabaseOnDisk::renameTable(
     /// data, because from that point on the rename cannot be undone safely. Keep the check after
     /// the source table is resolved and validated, so that a full destination does not mask
     /// `UNKNOWN_TABLE` and other source-side errors.
-    if (this != &to_database)
+    const bool check_destination_quotas = this != &to_database && destination_with_checked_quotas != &to_database;
+    if (check_destination_quotas)
     {
         if (auto * target_db = dynamic_cast<DatabaseOnDisk *>(&to_database))
         {
@@ -673,7 +683,8 @@ void DatabaseOnDisk::renameTable(
             if (auto * target_db = dynamic_cast<DatabaseOnDisk *>(&to_database))
             {
                 target_db->checkMetadataFilenameAvailability(to_table_name);
-                target_db->checkRowsLimit(getRowsToMove(table, local_context), to_table_name);
+                if (check_destination_quotas)
+                    target_db->checkRowsLimit(getRowsToMove(table, local_context), to_table_name);
             }
         }
         else
@@ -693,7 +704,12 @@ void DatabaseOnDisk::renameTable(
                 LOG_INFO(log, "Moving table from {} to {}", table_data_relative_path, to_database.getTableDataPath(create));
         }
 
-        /// Notify the table that it is renamed. It will move data to new path (if it stores data on disk) and update StorageID
+        /// Notify the table that it is renamed. It will move data to new path (if it stores data on disk) and update StorageID.
+        /// Inner tables renamed from here were already accounted in the destination quota checks above.
+        const IDatabase * previous_destination_with_checked_quotas = destination_with_checked_quotas;
+        if (this != &to_database)
+            destination_with_checked_quotas = &to_database;
+        SCOPE_EXIT({ destination_with_checked_quotas = previous_destination_with_checked_quotas; });
         table->rename(to_database.getTableDataPath(create), StorageID(create));
     }
     catch (const Exception &)
